@@ -15,22 +15,22 @@ def init_multinomial(dim: tuple, method='uniform'):
         raise
 
 
-def init_gaussian_emission(K, m, dim, scale=0.01):
+def init_gaussian_emission(K, m, dim, mean=0, scale=0.01):
     re = []
     for _ in range(np.power(K, m)):
-        re.append(_init_gaussian_emission(dim, scale))
+        re.append(_init_gaussian_emission(dim, mean, scale))
     return re
 
-def _init_gaussian_emission(dim: int, scale=0.01):
+def _init_gaussian_emission(dim: int, mean=0, scale=0.01):
     if type(dim) is int or np.intc:
-        return _init_one_dim(dim, scale)
+        return _init_one_dim(dim, mean, scale)
     else:
         raise Exception("请检查输入的维度，应该是int")
 
 
 def init_hidden_state_dist(dim: int, scale=0.1):
     if type(dim) is int or np.intc:
-        return _init_one_dim(dim, scale)[0]
+        return _init_one_dim(dim, 0, scale)[0]
     else:
         raise Exception("请检查输入的维度，应该是int")
 
@@ -114,16 +114,16 @@ def index_transfer(K, r, m):
     return temp
 
 
-def _init_one_dim(dim, scale=0.1):
+def _init_one_dim(dim, mean=0, scale=0.1):
     """
 
     :param dim: dim of observation variables
     :param scale: stdDev of mu
     :return: initiated mu and sigma. sigma is SPD matrix and mu is a multivariate gaussian
     """
-    mu = np.random.randn(dim) * scale
+    mu = np.random.randn(dim) * scale + mean
     N = dim * 3
-    tmp = np.random.randn(dim, N)
+    tmp = np.random.randn(dim, N) * scale + mean
     sigma = tmp @ tmp.T / N
     return mu, sigma
 
