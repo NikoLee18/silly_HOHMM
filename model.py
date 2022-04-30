@@ -259,6 +259,10 @@ class HMM:
             xi_n = (alpha[t] * self.emission_dens[t]).reshape(-1,1) * self.A * beta[t+1]
             xi.append(xi_n)
         xi = np.stack(xi, axis=0)
+        # 数值稳定版本的xi算法和原来不太一样了
+        array_scaling_factor = np.array(self.sf, ndmin=3)
+        xi = xi / array_scaling_factor
+
         return gamma, xi
 
 
