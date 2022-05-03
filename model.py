@@ -283,7 +283,7 @@ class HMM:
         return gamma, xi
 
     def _forward(self):
-        alpha = [self._forward_init()] # 初始化alpha
+        alpha = [self._forward_init()]    # 初始化alpha
         _factor = np.power(self.K, self.nu - self.r)
 
         # update: 分布不用算很多遍，由于先运行forward，直接存起来，会多次使用
