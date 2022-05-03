@@ -110,7 +110,10 @@ def index_transfer(K, r, m):
         index = np.array(index)   # 无论index是一个array还是一个int，都给他换成array
         if False in (index < (np.power(K, nu) - 0.9) * np.ones_like(index)):
             raise Exception("输入的index超出范围了")
-        return np.floor(index / np.power(K, mini))
+        elif m >= r:
+            return index
+        else:
+            return np.floor(index / np.power(K, nu - mini))
     return temp
 
 

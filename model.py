@@ -188,6 +188,7 @@ class HMM:
         self.r = r            # transit的阶数
         self.m = m            # emission的阶数
         self.nu = max(r, m)
+        self.mini = min(r, m)
         self.numEm = np.power(self.K, m)   # 提前计算好可以有多少个emission matrix
         self.max_perd = max_perd
         self.emis = tk.multivariate_normal      # 在这里传入正态分布的密度函数
@@ -242,7 +243,23 @@ class HMM:
 
     def _mu_sigma_hat(self):
         # 先算两个重要的量，参考论文公式(4.4),(4.5)，不过用矩阵整理好的就挺好整
-        Gm = self.gamma.sum(axis=0)
+        gmsum = self.gamma.sum(axis=0).reshape(np.power(self.K, self.m), -1).sum(axis=1).reshape(-1, 1)
+        # Gamma Sum用来当两个的分母,这里要reshape成一列，因为我们接下来用i行来表示第i中扩散参数
+        # 现在开始算mu的denom
+        gm = self.gamma.reshape(self.gamma.shape[0], np.power(self.K, self.m), -1).sum(axis=2).T  # 把gamma弄成横着长条形状
+        res_mu = gm @ self.Ob / gmsum # 有K^m行，列数和Observe一样多。 每一行代表一个mu_i的估计
+        # 现在算sigma的估计
+        mu = np.stack([i[0] for i in self.phi], axis=0)
+        centrl_obs = self.Ob - mu.reshape((mu.shape[0], -1, mu.shape[1])) # 这里用了一下broadcast机制，axis0表示参数种类
+        # axis1表示时间步，axis2是mu/观测值的维数
+        gm = np.stack([gm] * self.Ob.shape[1], axis=2)   # 这一步还是在调整分子上最后一部分的gamma，公式3.28里三个相乘没办法只用
+        # 矩阵乘法，所以我们把一部分和中心化后的观测阵做piecewise multiplication,然后再矩阵乘法
+        A = centrl_obs.transpose(0, 2, 1) @ (centrl_obs * gm)       # 这样就得到了一个离差阵（张量），axis0还是表示参数种类
+        res_sigma = A / gmsum.reshape(-1, 1, 1)    # 在axis0上，分别除以相应的公式3.28里的分母上的量
+        # 现在把mu, Sigma更新回class attributes里
+        self.phi = [(res_mu[i], res_sigma[i]) for i in range(res_mu.shape[0])]
+        return self.phi
+
 
 
     def E_step(self):
@@ -260,11 +277,10 @@ class HMM:
             xi.append(xi_n)
         xi = np.stack(xi, axis=0)
         # 数值稳定版本的xi算法和原来不太一样了
-        array_scaling_factor = np.array(self.sf, ndmin=3)
-        xi = xi / array_scaling_factor
+        array_scaling_factor = np.array(self.sf).reshape(-1, 1, 1)
+        xi = xi * array_scaling_factor
 
         return gamma, xi
-
 
     def _forward(self):
         alpha = [self._forward_init()] # 初始化alpha
@@ -309,7 +325,6 @@ class HMM:
         # backward的起始比较简单，初始化一个全是1的就行
         dim = np.power(self.K, self.nu)
         # _factor = np.power(self.K, self.nu - self.r)
-
         # 开始向后算，不过储存还是向前存
         beta = [np.ones((dim, 1))]
         for t in range(1, self.Ob.shape[0]):
